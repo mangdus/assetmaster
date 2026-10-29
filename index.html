@@ -55,7 +55,7 @@
                 </button>
                 <label class="cursor-pointer text-xs sm:text-sm font-medium px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition flex items-center gap-1.5">
                     <i class="fa-solid fa-upload"></i> <span class="hidden sm:inline">불러오기</span>
-                    <input type="file" id="importFileInput" onchange="importData(event)" class="hidden" accept=".json">
+                    <input type="file" id="importFileInput" onchange="importData(event)" class="hidden" accept=".json, .csv">
                 </label>
                 <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg shadow transition flex items-center gap-1.5">
                     <i class="fa-solid fa-plus"></i> <span>자산 추가</span>
@@ -380,25 +380,25 @@
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">금액 (원) <span class="text-rose-500">*</span></label>
                         <input type="number" id="assetAmount" required min="0" placeholder="0" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <p class="text-[11px] text-slate-400 mt-1" id="amountInKorean">0 원</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">기록/수정 일자 <span class="text-rose-500">*</span></label>
-                        <input type="date" id="assetDate" required class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">메모 / 비고</label>
-                    <textarea id="assetMemo" rows="2" placeholder="특이사항이나 매수 목적 등 간단한 기록" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
-                </div>
-
-                <!-- 모달 버튼 -->
-                <div class="flex items-center justify-end gap-2 pt-2">
-                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 transition">취소</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition shadow" id="submitBtn">저장하기</button>
-                </div>
-            </form>
+    <!-- 데이터 내보내기 형식 선택 모달 -->
+    <div id="exportModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 text-center">
+            <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="fa-solid fa-file-export text-xl"></i>
+            </div>
+            <h4 class="font-bold text-slate-800 text-base mb-1">데이터 내보내기</h4>
+            <p class="text-xs text-slate-500 mb-5">저장할 데이터 파일 형식을 선택해주세요.</p>
+            <div class="space-y-2 mb-4">
+                <button onclick="downloadCSV()" class="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl font-medium text-xs flex items-center justify-between transition">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-file-excel text-emerald-600 text-base"></i> 엑셀용 파일 (.csv)</span>
+                    <i class="fa-solid fa-chevron-right text-emerald-400 text-xs"></i>
+                </button>
+                <button onclick="downloadJSON()" class="w-full py-2.5 px-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 rounded-xl font-medium text-xs flex items-center justify-between transition">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-file-code text-blue-600 text-base"></i> 시스템 백업용 (.json)</span>
+                    <i class="fa-solid fa-chevron-right text-slate-400 text-xs"></i>
+                </button>
+            </div>
+            <button onclick="closeExportModal()" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 transition w-full">취소</button>
         </div>
     </div>
 
@@ -1116,6 +1116,19 @@
 
         // --- 11. 데이터 내보내기 및 불러오기 ---
         function exportData() {
+            const modal = document.getElementById('exportModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeExportModal() {
+            const modal = document.getElementById('exportModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        // 1) JSON 파일 내보내기
+        function downloadJSON() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(assets, null, 2));
             const downloadAnchor = document.createElement('a');
             const today = new Date().toISOString().split('T')[0];
@@ -1124,30 +1137,100 @@
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
-            showToast("자산 데이터 파일이 내보내기 되었습니다.");
+            closeExportModal();
+            showToast("JSON 파일로 내보내기 되었습니다.");
         }
 
+        // 2) 엑셀 호환 CSV 파일 내보내기 (한글 깨짐 방지 BOM 포함)
+        function downloadCSV() {
+            const today = new Date().toISOString().split('T')[0];
+            let csvContent = "\uFEFF"; // UTF-8 BOM 추가 (엑셀 한글 깨짐 방지)
+            csvContent += "자산/항목명,유형,금융기관/처,금액(원),기록/수정일자,메모\n";
+
+            assets.forEach(item => {
+                const name = `"${(item.name || '').replace(/"/g, '""')}"`;
+                const category = `"${(item.category || '').replace(/"/g, '""')}"`;
+                const inst = `"${(item.institution || '').replace(/"/g, '""')}"`;
+                const amount = item.amount || 0;
+                const date = `"${(item.updatedAt || '').replace(/"/g, '""')}"`;
+                const memo = `"${(item.memo || '').replace(/"/g, '""')}"`;
+
+                csvContent += `${name},${category},${inst},${amount},${date},${memo}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", url);
+            downloadAnchor.setAttribute("download", `AssetMaster_엑셀자산목록_${today}.csv`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            closeExportModal();
+            showToast("엑셀(CSV) 파일로 내보내기 되었습니다.");
+        }
+
+        // 불러오기 (JSON 및 CSV 파일 동시 지원)
         function importData(event) {
             const file = event.target.files[0];
             if (!file) return;
 
+            const fileName = file.name.toLowerCase();
             const reader = new FileReader();
+
             reader.onload = function(e) {
                 try {
-                    const imported = JSON.parse(e.target.result);
-                    if (Array.isArray(imported)) {
-                        assets = imported;
-                        saveAssets();
-                        renderApp();
-                        showToast("데이터를 성공적으로 불러왔습니다.");
-                    } else {
-                        showToast("올바르지 않은 데이터 형식입니다.", false);
+                    if (fileName.endsWith('.json')) {
+                        const imported = JSON.parse(e.target.result);
+                        if (Array.isArray(imported)) {
+                            assets = imported;
+                            saveAssets();
+                            renderApp();
+                            showToast("JSON 데이터를 성공적으로 불러왔습니다.");
+                        } else {
+                            showToast("올바르지 않은 JSON 데이터 형식입니다.", false);
+                        }
+                    } else if (fileName.endsWith('.csv')) {
+                        const text = e.target.result;
+                        const lines = text.split('\n');
+                        const importedAssets = [];
+
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (!line) continue;
+
+                            // CSV 큰따옴표 파싱
+                            const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+                            if (parts.length >= 4) {
+                                const clean = parts.map(p => p.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+                                importedAssets.push({
+                                    id: (Date.now() + i).toString(),
+                                    name: clean[0] || '이름 없음',
+                                    category: clean[1] || '기타자산',
+                                    institution: clean[2] || '',
+                                    amount: Number(clean[3]) || 0,
+                                    updatedAt: clean[4] || new Date().toISOString().split('T')[0],
+                                    memo: clean[5] || ''
+                                });
+                            }
+                        }
+
+                        if (importedAssets.length > 0) {
+                            assets = importedAssets;
+                            saveAssets();
+                            renderApp();
+                            showToast("엑셀(CSV) 데이터를 성공적으로 불러왔습니다.");
+                        } else {
+                            showToast("CSV 파일에서 읽을 수 있는 데이터가 없습니다.", false);
+                        }
                     }
                 } catch (err) {
+                    console.error(err);
                     showToast("파일 읽기 중 오류가 발생했습니다.", false);
                 }
             };
-            reader.readAsText(file);
+
+            reader.readAsText(file, 'UTF-8');
             event.target.value = '';
         }
 
